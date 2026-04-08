@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AR Playground</title>
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+    <style>
+        body { margin: 0; }
+        model-viewer { width: 100vw; height: 100vh; background-color: #eee; }
+    </style>
+</head>
+<body>
+    <model-viewer src="model.glb" ar ar-modes="webxr scene-viewer quick-look" camera-controls shadow-intensity="1" autoplay>
+        <button slot="ar-button" style="background: white; border-radius: 8px; border: none; padding: 10px; position: absolute; bottom: 20px; right: 20px;">
+            📸 現実世界に召喚する
+        </button>
+    </model-viewer>
+</body>
+</html>
