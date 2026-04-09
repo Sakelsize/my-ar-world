@@ -2,13 +2,13 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BB Local Playground</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BB Instant Tester</title>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #000; font-family: sans-serif; }
         
-        /* 背面カメラ */
+        /* 背景カメラ映像 */
         #video-bg {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -17,43 +17,64 @@
             display: none;
         }
 
-        /* 3Dモデル表示 */
+        /* 3Dモデル表示エリア */
         model-viewer {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             z-index: 2;
             --poster-color: transparent;
+            background-color: transparent;
         }
 
-        /* 操作UI */
-        .controls {
+        /* 画面右下の「モデル読み込み」ボタン */
+        .load-btn-container {
             position: absolute;
-            bottom: 30px; left: 50%; transform: translateX(-50%);
-            z-index: 100; display: flex; flex-direction: column; gap: 12px;
-            width: 80%;
+            bottom: 25px;
+            right: 20px;
+            z-index: 100;
+        }
+
+        /* 画面下中央の「カメラ起動」ボタン */
+        .cam-btn-container {
+            position: absolute;
+            bottom: 25px;
+            left: 20px;
+            z-index: 100;
         }
 
         .btn {
-            padding: 15px; border-radius: 12px; border: none;
-            font-weight: bold; font-size: 16px; text-align: center;
-            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            padding: 15px 20px;
+            border-radius: 12px;
+            border: none;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: transform 0.1s;
         }
+        
+        .btn:active { transform: scale(0.95); }
 
-        /* ファイル選択ボタンを装飾 */
-        .file-label { background: #ff4757; color: white; }
-        #file-input { display: none; }
-        #cam-btn { background: #2f3542; color: white; }
+        #load-trigger { background: #ff4757; color: white; } /* 赤色：メインアクション */
+        #cam-btn { background: #2f3542; color: white; opacity: 0.8; } /* 濃いグレー */
 
+        #file-input { display: none; } /* 実際の入力フォームは隠す */
+
+        /* ステータス表示 */
         #status {
-            position: absolute; top: 10px; left: 10px;
+            position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
             color: white; font-size: 12px; z-index: 200;
-            background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 4px;
+            background: rgba(0,0,0,0.6); padding: 6px 15px; border-radius: 20px;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
 
-    <div id="status">GLBファイルを選択してください</div>
+    <div id="status">右下のボタンからGLBを選択してください</div>
 
     <video id="video-bg" autoplay playsinline></video>
 
@@ -65,14 +86,19 @@
         interaction-prompt="none"
         shadow-intensity="1"
         environment-image="neutral"
-        autoplay>
+        autoplay
+        touch-action="none">
     </model-viewer>
 
-    <div class="controls">
-        <label for="file-input" class="btn file-label">📂 モデルを選択 (GLB)</label>
+    <div class="cam-btn-container">
+        <button id="cam-btn" class="btn">📸 背景カメラ</button>
+    </div>
+
+    <div class="load-btn-container">
+        <label for="file-input">
+            <div id="load-trigger" class="btn">📂 モデル読込</div>
+        </label>
         <input type="file" id="file-input" accept=".glb">
-        
-        <button id="cam-btn" class="btn">📸 カメラを背景にする</button>
     </div>
 
     <script>
@@ -82,17 +108,22 @@
         const camBtn = document.querySelector('#cam-btn');
         const status = document.querySelector('#status');
 
-        // 1. ローカルファイルの読み込み処理
+        // 1. ファイルが選択された時の処理
         fileInput.addEventListener('change', (event) => {
             const file = event.target.files;
             if (file) {
+                // ローカル上のファイルにアクセスするためのURLを生成
                 const url = URL.createObjectURL(file);
-                mv.src = url; // 選択されたファイルを直接流し込む
+                mv.src = url;
                 status.textContent = `表示中: ${file.name}`;
+                
+                // AndroidのScene Viewer用に絶対パスとして認識させる処理
+                //（ローカルURLは特殊なため、そのままだとScene Viewerでエラーになる場合があるため
+                // webxrモードを優先するか、ブラウザ内プレビューで確認してください）
             }
         });
 
-        // 2. カメラ起動処理
+        // 2. 背景カメラの起動
         camBtn.addEventListener('click', async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -101,16 +132,12 @@
                 });
                 video.srcObject = stream;
                 video.style.display = 'block';
-                camBtn.style.display = 'none';
-                status.textContent = "カメラ重畳モード";
+                camBtn.style.opacity = '1';
+                camBtn.style.background = '#2ed573'; // 起動中は緑に
+                status.textContent = "カメラ重畳モード有効";
             } catch (err) {
-                alert("カメラの起動に失敗しました。Chromeで開き、HTTPS接続であることを確認してください。");
+                alert("カメラの起動に失敗しました。HTTPS(GitHub Pages)で開き、許可を出してください。");
             }
-        });
-
-        // エラーハンドリング
-        mv.addEventListener('error', () => {
-            status.textContent = "エラー: GLBを読み込めませんでした";
         });
     </script>
 </body>
