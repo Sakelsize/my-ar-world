@@ -1,18 +1,114 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-    <title>AR Playground</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blockbench AR Playground</title>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     <style>
-        body { margin: 0; }
-        model-viewer { width: 100vw; height: 100vh; background-color: #eee; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        
+        /* 背景カメラ映像 */
+        #video-bg {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover;
+            z-index: 1;
+        }
+
+        /* 3Dモデル表示エリア */
+        model-viewer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 2;
+            --poster-color: transparent;
+            background-color: transparent;
+        }
+
+        /* UIコンテナ */
+        .ui-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+
+        button {
+            padding: 12px 24px;
+            border-radius: 50px;
+            border: none;
+            background: #fff;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        #start-btn { background: #007AFF; color: white; } /* 青色で目立たせる */
+
+        /* 本格ARボタンのカスタムスタイル（model-viewer内蔵ボタン） */
+        .ar-button {
+            background-color: #fff;
+            border-radius: 4px;
+            border: none;
+            position: absolute;
+            top: 16px;
+            right: 16px;
+        }
     </style>
 </head>
 <body>
-    <model-viewer src="model.glb" ar ar-modes="webxr scene-viewer quick-look" camera-controls shadow-intensity="1" autoplay>
-        <button slot="ar-button" style="background: white; border-radius: 8px; border: none; padding: 10px; position: absolute; bottom: 20px; right: 20px;">
-            📸 現実世界に召喚する
+
+    <video id="video-bg" autoplay playsinline></video>
+
+    <model-viewer 
+        id="mv"
+        src="model.glb" 
+        ar 
+        ar-modes="webxr scene-viewer quick-look" 
+        camera-controls 
+        interaction-prompt="none"
+        shadow-intensity="1"
+        environment-image="neutral" 
+        autoplay
+        min-camera-orbit="auto -infinity auto"
+        max-camera-orbit="auto infinity auto"
+        min-field-of-view="0deg"
+        max-field-of-view="180deg"
+        touch-action="none">
+        
+        <button slot="ar-button" class="ar-button">
+            ✨ 本格ARモード (床検知)
         </button>
+
     </model-viewer>
+
+    <div class="ui-container">
+        <button id="start-btn">📸 カメラを起動して重畳する</button>
+    </div>
+
+    <script>
+        const video = document.getElementById('video-bg');
+        const btn = document.getElementById('start-btn');
+
+        btn.addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' },
+                    audio: false
+                });
+                video.srcObject = stream;
+                btn.style.display = 'none'; 
+            } catch (err) {
+                alert("カメラの起動に失敗しました。HTTPS環境であるか確認してください。");
+                console.error(err);
+            }
+        });
+    </script>
 </body>
 </html>
