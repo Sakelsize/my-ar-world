@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BB Android Playground</title>
+    <title>BB Local Playground</title>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #1a1a1a; font-family: sans-serif; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #000; font-family: sans-serif; }
         
-        /* 背面のリアルタイムカメラ映像 */
+        /* 背面カメラ */
         #video-bg {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -17,110 +17,82 @@
             display: none;
         }
 
-        /* 3Dモデル表示用コンテナ */
+        /* 3Dモデル表示 */
         model-viewer {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             z-index: 2;
             --poster-color: transparent;
-            background-color: transparent;
         }
 
-        /* 読み込み状態の表示（デバッグ用） */
-        #status-msg {
-            position: absolute;
-            top: 10px; left: 10px;
-            color: white; background: rgba(0,0,0,0.5);
-            padding: 5px 10px; font-size: 12px; z-index: 200;
-            pointer-events: none;
-        }
-
-        /* 下部ボタンエリア */
+        /* 操作UI */
         .controls {
             position: absolute;
             bottom: 30px; left: 50%; transform: translateX(-50%);
-            z-index: 100; display: flex; flex-direction: column; gap: 10px;
+            z-index: 100; display: flex; flex-direction: column; gap: 12px;
+            width: 80%;
         }
 
-        button {
-            padding: 15px 30px; border-radius: 50px; border: none;
-            background: #fff; font-weight: bold; font-size: 16px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-            cursor: pointer;
+        .btn {
+            padding: 15px; border-radius: 12px; border: none;
+            font-weight: bold; font-size: 16px; text-align: center;
+            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
-        #start-camera-btn { background: #4285f4; color: white; }
+        /* ファイル選択ボタンを装飾 */
+        .file-label { background: #ff4757; color: white; }
+        #file-input { display: none; }
+        #cam-btn { background: #2f3542; color: white; }
 
-        /* 本格ARモードボタン（Android Scene Viewer起動用） */
-        #ar-button {
-            background-color: white;
-            border-radius: 8px;
-            border: 1px solid #dadce0;
-            padding: 10px 16px;
-            display: flex; align-items: center; gap: 8px;
-            position: absolute; top: 16px; right: 16px;
-            z-index: 101;
+        #status {
+            position: absolute; top: 10px; left: 10px;
+            color: white; font-size: 12px; z-index: 200;
+            background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 4px;
         }
     </style>
 </head>
 <body>
 
-    <div id="status-msg">モデル読み込み中...</div>
+    <div id="status">GLBファイルを選択してください</div>
 
     <video id="video-bg" autoplay playsinline></video>
 
     <model-viewer 
         id="mv"
-        src="model.glb" 
         ar 
-        ar-modes="scene-viewer webxr quick-look" 
+        ar-modes="scene-viewer webxr" 
         camera-controls 
         interaction-prompt="none"
         shadow-intensity="1"
         environment-image="neutral"
-        autoplay
-        loading="eager"
-        reveal="auto">
-        
-        <button slot="ar-button" id="ar-button">
-            📦 現実世界に置く (AR)
-        </button>
-
+        autoplay>
     </model-viewer>
 
     <div class="controls">
-        <button id="start-camera-btn">📸 カメラを背景にする</button>
+        <label for="file-input" class="btn file-label">📂 モデルを選択 (GLB)</label>
+        <input type="file" id="file-input" accept=".glb">
+        
+        <button id="cam-btn" class="btn">📸 カメラを背景にする</button>
     </div>
 
     <script>
         const mv = document.querySelector('#mv');
+        const fileInput = document.querySelector('#file-input');
         const video = document.querySelector('#video-bg');
-        const camBtn = document.querySelector('#start-camera-btn');
-        const status = document.querySelector('#status-msg');
+        const camBtn = document.querySelector('#cam-btn');
+        const status = document.querySelector('#status');
 
-        // 1. Android対策：モデルのURLを「絶対パス」に強制変換して再読み込み
-        // これをしないと Android の Scene Viewer がファイルを認識できません
-        const forceAbsoluteUrl = () => {
-            const relPath = mv.getAttribute('src');
-            const absUrl = new URL(relPath, window.location.href).href;
-            mv.src = absUrl;
-            console.log("Model Path Fixed:", absUrl);
-        };
-        forceAbsoluteUrl();
-
-        // 2. 読み込み状態の監視
-        mv.addEventListener('load', () => {
-            status.textContent = "モデル読み込み完了！";
-            setTimeout(() => status.style.opacity = '0', 2000);
+        // 1. ローカルファイルの読み込み処理
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files;
+            if (file) {
+                const url = URL.createObjectURL(file);
+                mv.src = url; // 選択されたファイルを直接流し込む
+                status.textContent = `表示中: ${file.name}`;
+            }
         });
 
-        mv.addEventListener('error', (e) => {
-            status.textContent = "エラー: model.glbが見つかりません";
-            status.style.background = "red";
-            console.error(e);
-        });
-
-        // 3. 背面カメラ起動処理
+        // 2. カメラ起動処理
         camBtn.addEventListener('click', async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -130,15 +102,16 @@
                 video.srcObject = stream;
                 video.style.display = 'block';
                 camBtn.style.display = 'none';
+                status.textContent = "カメラ重畳モード";
             } catch (err) {
-                alert("カメラ起動に失敗。HTTPSで接続しているか、ブラウザ設定で許可してください。");
+                alert("カメラの起動に失敗しました。Chromeで開き、HTTPS接続であることを確認してください。");
             }
         });
 
-        // AndroidのLINE内ブラウザ等で開いた場合への警告
-        if (!/Chrome|SamsungBrowser/.test(navigator.userAgent)) {
-            status.textContent = "推奨：Chromeブラウザで開いてください";
-        }
+        // エラーハンドリング
+        mv.addEventListener('error', () => {
+            status.textContent = "エラー: GLBを読み込めませんでした";
+        });
     </script>
 </body>
 </html>
