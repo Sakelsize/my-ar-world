@@ -3,20 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blockbench AR Playground</title>
+    <title>BB Android Playground</title>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #000; }
         
-        /* 背景カメラ映像 */
+        /* 背景カメラ */
         #video-bg {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             object-fit: cover;
             z-index: 1;
+            display: none; /* 初期状態は非表示 */
         }
 
-        /* 3Dモデル表示エリア */
+        /* 3Dモデル表示 */
         model-viewer {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -26,39 +27,26 @@
         }
 
         /* UIコンテナ */
-        .ui-container {
+        .controls {
             position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 100;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            align-items: center;
+            bottom: 30px; left: 50%; transform: translateX(-50%);
+            z-index: 100; display: flex; flex-direction: column; gap: 10px;
         }
 
         button {
-            padding: 12px 24px;
-            border-radius: 50px;
-            border: none;
-            background: #fff;
-            color: #000;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            padding: 15px 30px; border-radius: 50px; border: none;
+            background: #fff; font-weight: bold; font-size: 16px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            white-space: nowrap;
         }
 
-        #start-btn { background: #007AFF; color: white; } /* 青色で目立たせる */
+        #start-btn { background: #4285f4; color: white; }
 
-        /* 本格ARボタンのカスタムスタイル（model-viewer内蔵ボタン） */
+        /* 本格ARボタン（AndroidのScene Viewer用） */
         .ar-button {
-            background-color: #fff;
-            border-radius: 4px;
-            border: none;
-            position: absolute;
-            top: 16px;
-            right: 16px;
+            background: #fff; border-radius: 10px; border: none;
+            padding: 10px; position: absolute; top: 20px; right: 20px;
+            z-index: 101;
         }
     </style>
 </head>
@@ -74,27 +62,30 @@
         camera-controls 
         interaction-prompt="none"
         shadow-intensity="1"
-        environment-image="neutral" 
+        environment-image="neutral"
         autoplay
         min-camera-orbit="auto -infinity auto"
-        max-camera-orbit="auto infinity auto"
-        min-field-of-view="0deg"
-        max-field-of-view="180deg"
-        touch-action="none">
+        max-camera-orbit="auto infinity auto">
         
         <button slot="ar-button" class="ar-button">
-            ✨ 本格ARモード (床検知)
+            📦 本格ARモードを起動
         </button>
 
     </model-viewer>
 
-    <div class="ui-container">
-        <button id="start-btn">📸 カメラを起動して重畳する</button>
+    <div class="controls">
+        <button id="start-btn">📸 カメラを背景にする</button>
     </div>
 
     <script>
         const video = document.getElementById('video-bg');
         const btn = document.getElementById('start-btn');
+        const mv = document.getElementById('mv');
+
+        // AndroidのScene Viewer対策：相対パスを絶対パスに自動変換
+        // これをしないとAndroid標準ARがモデルを見失うことがあります
+        const modelUrl = new URL(mv.getAttribute('src'), window.location.href).href;
+        mv.setAttribute('src', modelUrl);
 
         btn.addEventListener('click', async () => {
             try {
@@ -103,9 +94,10 @@
                     audio: false
                 });
                 video.srcObject = stream;
-                btn.style.display = 'none'; 
+                video.style.display = 'block'; // カメラを表示
+                btn.style.display = 'none';    // ボタンを消す
             } catch (err) {
-                alert("カメラの起動に失敗しました。HTTPS環境であるか確認してください。");
+                alert("カメラの起動に失敗しました。GitHub Pages(HTTPS)で開いているか確認してください。");
                 console.error(err);
             }
         });
