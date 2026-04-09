@@ -6,18 +6,18 @@
     <title>BB Android Playground</title>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #000; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #1a1a1a; font-family: sans-serif; }
         
-        /* 背景カメラ */
+        /* 背面のリアルタイムカメラ映像 */
         #video-bg {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             object-fit: cover;
             z-index: 1;
-            display: none; /* 初期状態は非表示 */
+            display: none;
         }
 
-        /* 3Dモデル表示 */
+        /* 3Dモデル表示用コンテナ */
         model-viewer {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -26,7 +26,16 @@
             background-color: transparent;
         }
 
-        /* UIコンテナ */
+        /* 読み込み状態の表示（デバッグ用） */
+        #status-msg {
+            position: absolute;
+            top: 10px; left: 10px;
+            color: white; background: rgba(0,0,0,0.5);
+            padding: 5px 10px; font-size: 12px; z-index: 200;
+            pointer-events: none;
+        }
+
+        /* 下部ボタンエリア */
         .controls {
             position: absolute;
             bottom: 30px; left: 50%; transform: translateX(-50%);
@@ -36,21 +45,27 @@
         button {
             padding: 15px 30px; border-radius: 50px; border: none;
             background: #fff; font-weight: bold; font-size: 16px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            white-space: nowrap;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            cursor: pointer;
         }
 
-        #start-btn { background: #4285f4; color: white; }
+        #start-camera-btn { background: #4285f4; color: white; }
 
-        /* 本格ARボタン（AndroidのScene Viewer用） */
-        .ar-button {
-            background: #fff; border-radius: 10px; border: none;
-            padding: 10px; position: absolute; top: 20px; right: 20px;
+        /* 本格ARモードボタン（Android Scene Viewer起動用） */
+        #ar-button {
+            background-color: white;
+            border-radius: 8px;
+            border: 1px solid #dadce0;
+            padding: 10px 16px;
+            display: flex; align-items: center; gap: 8px;
+            position: absolute; top: 16px; right: 16px;
             z-index: 101;
         }
     </style>
 </head>
 <body>
+
+    <div id="status-msg">モデル読み込み中...</div>
 
     <video id="video-bg" autoplay playsinline></video>
 
@@ -58,49 +73,72 @@
         id="mv"
         src="model.glb" 
         ar 
-        ar-modes="webxr scene-viewer quick-look" 
+        ar-modes="scene-viewer webxr quick-look" 
         camera-controls 
         interaction-prompt="none"
         shadow-intensity="1"
         environment-image="neutral"
         autoplay
-        min-camera-orbit="auto -infinity auto"
-        max-camera-orbit="auto infinity auto">
+        loading="eager"
+        reveal="auto">
         
-        <button slot="ar-button" class="ar-button">
-            📦 本格ARモードを起動
+        <button slot="ar-button" id="ar-button">
+            📦 現実世界に置く (AR)
         </button>
 
     </model-viewer>
 
     <div class="controls">
-        <button id="start-btn">📸 カメラを背景にする</button>
+        <button id="start-camera-btn">📸 カメラを背景にする</button>
     </div>
 
     <script>
-        const video = document.getElementById('video-bg');
-        const btn = document.getElementById('start-btn');
-        const mv = document.getElementById('mv');
+        const mv = document.querySelector('#mv');
+        const video = document.querySelector('#video-bg');
+        const camBtn = document.querySelector('#start-camera-btn');
+        const status = document.querySelector('#status-msg');
 
-        // AndroidのScene Viewer対策：相対パスを絶対パスに自動変換
-        // これをしないとAndroid標準ARがモデルを見失うことがあります
-        const modelUrl = new URL(mv.getAttribute('src'), window.location.href).href;
-        mv.setAttribute('src', modelUrl);
+        // 1. Android対策：モデルのURLを「絶対パス」に強制変換して再読み込み
+        // これをしないと Android の Scene Viewer がファイルを認識できません
+        const forceAbsoluteUrl = () => {
+            const relPath = mv.getAttribute('src');
+            const absUrl = new URL(relPath, window.location.href).href;
+            mv.src = absUrl;
+            console.log("Model Path Fixed:", absUrl);
+        };
+        forceAbsoluteUrl();
 
-        btn.addEventListener('click', async () => {
+        // 2. 読み込み状態の監視
+        mv.addEventListener('load', () => {
+            status.textContent = "モデル読み込み完了！";
+            setTimeout(() => status.style.opacity = '0', 2000);
+        });
+
+        mv.addEventListener('error', (e) => {
+            status.textContent = "エラー: model.glbが見つかりません";
+            status.style.background = "red";
+            console.error(e);
+        });
+
+        // 3. 背面カメラ起動処理
+        camBtn.addEventListener('click', async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'environment' },
                     audio: false
                 });
                 video.srcObject = stream;
-                video.style.display = 'block'; // カメラを表示
-                btn.style.display = 'none';    // ボタンを消す
+                video.style.display = 'block';
+                camBtn.style.display = 'none';
             } catch (err) {
-                alert("カメラの起動に失敗しました。GitHub Pages(HTTPS)で開いているか確認してください。");
-                console.error(err);
+                alert("カメラ起動に失敗。HTTPSで接続しているか、ブラウザ設定で許可してください。");
             }
         });
+
+        // AndroidのLINE内ブラウザ等で開いた場合への警告
+        if (!/Chrome|SamsungBrowser/.test(navigator.userAgent)) {
+            status.textContent = "推奨：Chromeブラウザで開いてください";
+        }
     </script>
 </body>
 </html>
